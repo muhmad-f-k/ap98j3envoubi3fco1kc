@@ -417,26 +417,25 @@ subreddits_top_1000 = [
 ]
 
 async def find_random_subreddit_for_keyword(keyword: str = "BTC"):
-    """
-    Generate a subreddit URL using the search tool with `keyword`.
-    It randomly chooses one of the resulting subreddit.
-    """
     logging.info("[Reddit] generating subreddit target URL.")
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://www.reddit.com/search/?q={keyword}&type=sr",
-                headers={"User-Agent": random.choice(USER_AGENT_LIST)},              
-                timeout = BASE_TIMEOUT
+                headers={"User-Agent": random.choice(USER_AGENT_LIST)},
+                timeout=BASE_TIMEOUT
             ) as response:
                 html_content = await response.text()
                 tree = html.fromstring(html_content)
                 urls = [
                     url
                     for url in tree.xpath('//a[contains(@href, "/r/")]//@href')
-                    if not "/r/popular" in url
+                    if "/r/popular" not in url
                 ]
-                result = f"https:/reddit.com{random.choice(urls)}/new"
+                if not urls:
+                    logging.error("No subreddits found for the keyword. Please check the keyword or XPath query.")
+                    return None  # Or handle this scenario appropriately
+                result = f"https://reddit.com{random.choice(urls)}/new"
                 return result
     finally:
         await session.close()
