@@ -749,14 +749,38 @@ def post_process_item(item):
         logging.warning(f"[Reddit] failed to correct the URL of item %s",item["url"])
     return item
 
-def is_valid_item(item, min_post_length):
-    if len(item["content"])<min_post_length \
-    or item["url"].startswith("https://reddit.comhttps:")  \
-    or not ("reddit.com" in item["url"]) \
-    or item["content"] == "[deleted]":
+def is_valid_item(item: dict, min_post_length: int) -> bool:
+    """
+    Check if a scraped item is valid based on specified criteria.
+
+    Parameters:
+    - item: The item to check, expected to be a dictionary.
+    - min_post_length: Minimum length of the item's content to be considered valid.
+
+    Returns:
+    - True if the item meets all the criteria, False otherwise.
+    """
+    # Check if the item has 'content' key and its value is not None
+    content = item.get('content')
+    if content is None:
         return False
-    else:
-        return True
+
+    # Check for minimum content length
+    if len(content) < min_post_length:
+        return False
+
+    # Check if the content is not '[deleted]' or '[removed]'
+    if content in ['[deleted]', '[removed]']:
+        return False
+
+    # Check for any other specific conditions you might have
+    # For example, ensuring the item has a certain key or value
+    # if 'some_key' not in item or item['some_key'] != 'expected_value':
+    #     return False
+
+    # If all checks pass, the item is considered valid
+    return True
+
 
 async def query(parameters: dict) -> AsyncGenerator[Item, None]:
     global MAX_EXPIRATION_SECONDS, SKIP_POST_PROBABILITY
