@@ -760,6 +760,7 @@ def is_valid_item(item, min_post_length):
 
 async def query(parameters: dict) -> AsyncGenerator[Item, None]:
     global MAX_EXPIRATION_SECONDS, SKIP_POST_PROBABILITY
+    # Unpack parameters with added checks or defaults as needed
     (
         max_oldness_seconds,
         MAXIMUM_ITEMS_TO_COLLECT,
@@ -768,41 +769,43 @@ async def query(parameters: dict) -> AsyncGenerator[Item, None]:
         new_layout_scraping_weight,
         SKIP_POST_PROBABILITY
     ) = read_parameters(parameters)
+
     logging.info(f"[Reddit] Input parameters: {parameters}")
     MAX_EXPIRATION_SECONDS = max_oldness_seconds
     yielded_items = 0  # Counter for the number of yielded items
 
-    
+    # Initial delay to mitigate quick successive requests
     await asyncio.sleep(random.uniform(3, 15))
-    for i in range(nb_subreddit_attempts):
-        await asyncio.sleep(random.uniform(1, i))
-        url = await generate_url(**parameters["url_parameters"])
-        # if url ends with "/new/new/.json", replace it with "/new.json"
-        if url.endswith("/new/new/.json"):
-            url = url.replace("/new/new/.json", "/new.json")
-        logging.info(f"[Reddit] Attempt {(i+1)}/{nb_subreddit_attempts} Scraping {url} with max oldness of {max_oldness_seconds}")
-        if "reddit.com" not in url:
-            raise ValueError(f"Not a Reddit URL {url}")
-        url_parameters = url.split("reddit.com")[1].split("/")[1:]
-        if "comments" in url_parameters:
-            async for result in scrap_post(url):
 
+    for attempt in range(nb_subreddit_attempts):
+        await asyncio.sleep(random.uniform(1, attempt + 1))  # Delay increases with each attempt
+        url = await generate_url(**parameters.get("url_parameters", {}))
+
+        # Correct URL if necessary
+        if url and url.endswith("/new/new/.json"):
+            url = url.replace("/new/new/.json", "/new.json")
+
+        # Log the scraping attempt
+        logging.info(f"[Reddit] Attempt {attempt + 1}/{nb_subreddit_attempts} Scraping {url} with max oldness of {max_oldness_seconds}")
+        
+        # Validate the URL
+        if not url or "reddit.com" not in url:
+            logging.error("Invalid URL generated or not a Reddit URL. Skipping this attempt.")
+            continue
+
+        # Determine the appropriate scraping function
+        selected_function = scrap_subreddit_json if 'comments' not in url else scrap_post
+        if random.random() < new_layout_scraping_weight:
+            selected_function = scrap_subreddit_new_layout
+
+        # Perform the scraping
+        async for result in selected_function(url):
+            if yielded_items >= MAXIMUM_ITEMS_TO_COLLECT:
+                break  # Exit if maximum items have been collected
+
+            # Process and validate each item
+            result = post_process_item(result)
+            if is_valid_item(result, min_post_length):
+                logging.info(f"[Reddit] Found item: {result}")
+                yield result
                 yielded_items += 1
-                result = post_process_item(result)
-                if is_valid_item(result, min_post_length):
-                    logging.info(f"[Reddit] Found Reddit post: {result}")
-                    yield result
-                if yielded_items >= MAXIMUM_ITEMS_TO_COLLECT:
-                    break
-        else:
-            selected_function = scrap_subreddit_json
-            if random.random() < new_layout_scraping_weight:
-                selected_function = scrap_subreddit_new_layout
-            async for result in selected_function(url):
-                yielded_items += 1
-                result = post_process_item(result)           
-                if is_valid_item(result, min_post_length):
-                    logging.info(f"[Reddit] Found Reddit comment: {result}")
-                    yield result
-                if yielded_items >= MAXIMUM_ITEMS_TO_COLLECT:
-                    break
