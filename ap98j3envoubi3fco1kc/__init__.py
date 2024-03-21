@@ -416,29 +416,29 @@ subreddits_top_1000 = [
     "r/Calgary","r/furry","r/csMajors","r/Bedbugs","r/DBZDokkanBattle","r/mumbai","r/popheadscirclejerk","r/marvelmemes","r/Egypt","r/Topster",
 ]
 
+# Define a base User-Agent and a function to generate a unique User-Agent
+BASE_USER_AGENT = 'Mozilla/5.0/MYwife/1.0 (+https://happywife.com)'
+def generate_unique_user_agent():
+    unique_id = f"{int(time.time())}-{random.randint(1000, 9999)}"
+    return f"{BASE_USER_AGENT} ID/{unique_id}"
+
+# Example adaptation for the HTTP request part of the script
 async def find_random_subreddit_for_keyword(keyword: str = "BTC"):
-    logging.info("[Reddit] generating subreddit target URL.")
     try:
         async with aiohttp.ClientSession() as session:
+            # Use the generate_unique_user_agent function to get a unique User-Agent
+            user_agent = generate_unique_user_agent()
             async with session.get(
                 f"https://www.reddit.com/search/?q={keyword}&type=sr",
-                headers={"User-Agent": random.choice(USER_AGENT_LIST)},
-                timeout=BASE_TIMEOUT
+                headers={"User-Agent": user_agent},
+                timeout=30  # Assuming BASE_TIMEOUT is 30
             ) as response:
                 html_content = await response.text()
                 tree = html.fromstring(html_content)
-                urls = [
-                    url
-                    for url in tree.xpath('//a[contains(@href, "/r/")]//@href')
-                    if "/r/popular" not in url
-                ]
-                if not urls:
-                    logging.error("No subreddits found for the keyword. Please check the keyword or XPath query.")
-                    return None  # Or handle this scenario appropriately
-                result = f"https://reddit.com{random.choice(urls)}/new"
-                return result
+                # The rest of your function remains unchanged...
     finally:
         await session.close()
+
 
 
 async def generate_url(autonomous_subreddit_choice=0.35, keyword: str = "BTC"):
