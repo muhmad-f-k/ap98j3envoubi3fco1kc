@@ -1,4 +1,5 @@
 import random
+import string
 import aiohttp
 import asyncio
 from lxml import html
@@ -19,9 +20,8 @@ from exorde_data import (
     Url,
     Domain,
 )
-
-import hashlib
 from wordsegment import load, segment
+
 load()
 
 USER_AGENT_LIST = [
@@ -416,6 +416,13 @@ subreddits_top_1000 = [
     "r/Calgary","r/furry","r/csMajors","r/Bedbugs","r/DBZDokkanBattle","r/mumbai","r/popheadscirclejerk","r/marvelmemes","r/Egypt","r/Topster",
 ]
 
+
+# Function to generate a random cookie
+def generate_random_cookie():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+
+cookies = {"reddit_session": generate_random_cookie()}
+
 async def find_random_subreddit_for_keyword(keyword: str = "BTC"):
     """
     Generate a subreddit URL using the search tool with `keyword`.
@@ -423,11 +430,11 @@ async def find_random_subreddit_for_keyword(keyword: str = "BTC"):
     """
     logging.info("[Reddit] generating subreddit target URL.")
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(cookies=cookies) as session:
             async with session.get(
                 f"https://www.reddit.com/search/?q={keyword}&type=sr",
                 headers={"User-Agent": random.choice(USER_AGENT_LIST)},              
-                timeout = BASE_TIMEOUT
+                timeout=BASE_TIMEOUT
             ) as response:
                 html_content = await response.text()
                 tree = html.fromstring(html_content)
@@ -549,7 +556,7 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
 
     resolvers = {"Listing": listing, "t1": comment, "t3": post, "more": more}
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(cookies=cookies) as session:
             _url = url + ".json"
             logging.info(f"[Reddit] Scraping - getting {_url}")
             async with session.get(_url, 
@@ -595,7 +602,7 @@ def split_strings_subreddit_name(input_string):
 async def scrap_subreddit_new_layout(subreddit_url: str) -> AsyncGenerator[Item, None]:
     
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(cookies=cookies) as session:
             url_to_fetch = subreddit_url
             logging.info("[Reddit] [NEW LAYOUT MODE] Opening: %s",url_to_fetch)
             async with session.get(url_to_fetch, 
@@ -630,7 +637,7 @@ def find_permalinks(data):
 
 async def scrap_subreddit_json(subreddit_url: str) -> AsyncGenerator[Item, None]:
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(cookies=cookies) as session:
             url_to_fetch = subreddit_url
             if random.random() < 0.75:
                 url_to_fetch = url_to_fetch + "/new"
